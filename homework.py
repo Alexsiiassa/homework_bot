@@ -2,6 +2,7 @@ import logging
 import os
 import sys
 import time
+from http import HTTPStatus
 
 import requests
 import telegram
@@ -35,16 +36,28 @@ HOMEWORK_STATUSES = {
 }
 
 
+class TgBotError(Exception):
+    """Собственный класс ошибки."""
+
+    pass
+
+
 def log_and_raise_error(error_msg):
     """Логирование и возбуждение исключения."""
     message = f'Сбой в работе: {error_msg}'
     logger.error(message)
-    raise Exception(message)
+    raise TgBotError(message)
 
 
 def send_message(bot, message):
     """Сообщение от бота."""
     bot.send_message(chat_id=TELEGRAM_CHAT_ID, text=message)
+
+
+class EndpointError(Exception):
+    """Собственный класс ошибки."""
+
+    pass
 
 
 def get_api_answer(current_timestamp):
@@ -56,16 +69,16 @@ def get_api_answer(current_timestamp):
             ENDPOINT, headers=HEADERS,
             params=params
         )
-    except Exception as error:
+    except requests.exceptions.HTTPError as error:
         message = f'Другая ошибка {error}'
         logger.error(message)
-    if homeworks.status_code == 200:
-        return homeworks.json()
-    else:
-        raise Exception(
+        raise ValueError(message)
+    if homeworks.status_code != HTTPStatus.OK:
+        raise EndpointError(
             f'Сбой в работе программы: Эндпоинт {ENDPOINT} не доступен.'
             f'Код ответа API {homeworks.status_code}'
         )
+    return homeworks.json()
 
 
 def check_response(response):
@@ -101,14 +114,6 @@ def parse_status(homework):
         homework_status = homework['status']
     except KeyError:
         raise KeyError('Статус работы не документирован')
-    else:
-        if homework_status not in HOMEWORK_STATUSES:
-            error_msg = (
-                f'Статус {homework_status} '
-                f'работы "{homework_name}" недокументирован'
-            )
-            log_and_raise_error(error_msg)
-
     verdict = HOMEWORK_STATUSES[homework_status]
     return (
         'Изменился статус проверки работы '
@@ -144,6 +149,7 @@ def main():
         try:
             response = get_api_answer(current_timestamp)
             homewrks = check_response(response)
+            current_timestamp = response['current_date']
             for homework in homewrks:
                 verdict = parse_status(homework)
                 send_message(bot, verdict)
@@ -152,8 +158,6 @@ def main():
             message = f'Сбой в работе: {error}'
             logger.error(message)
             time.sleep(RETRY_TIME)
-        else:
-            current_timestamp = response['current_date']
 
 
 if __name__ == '__main__':
