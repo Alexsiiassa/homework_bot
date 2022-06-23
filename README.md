@@ -12,7 +12,7 @@ pySocks (направление трафика через SOCKS и HTTP прок
 
 ## Как запустить программу:
 Клонируйте репозитроий с программой:
-git clone https://github.com/leks20/telegram-api-bot
+git clone https://github.com/Alexsiiassa/homework_bot
 В созданной директории установите виртуальное окружение, активируйте его и установите необходимые зависимости:
 python3 -m venv venv
 
